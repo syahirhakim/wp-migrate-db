@@ -672,6 +672,44 @@ class Replace
             return $data;
         }
 
+        /*
+         * Literal find text is still a contiguous substring inside serialized and JSON values.
+         * Skip unserialize-and-replace when it cannot change this string. Regex, subdomain, and
+         * protocol-mismatch modes can rewrite text that does not contain the typed find string.
+         */
+        $has_regex_pair = is_array($this->regex) && in_array(true, $this->regex, true);
+        if (is_string($data) && !$has_regex_pair && !$this->is_subdomain_replaces_on() && true !== $this->is_protocol_mismatch) {
+            $needle_lists = is_array($this->search) ? array($this->search) : array();
+            if (
+                is_array($this->json_search)
+                && is_array($this->json_replace_tables)
+                && is_array($this->json_replace_columns)
+                && in_array($this->table, $this->json_replace_tables, true)
+                && in_array($this->column, $this->json_replace_columns, true)
+            ) {
+                $needle_lists[] = $this->json_search;
+            }
+
+            $needle_found = false;
+            foreach ($needle_lists as $needles) {
+                foreach ($needles as $key => $search_string) {
+                    if (!is_string($search_string) || '' === $search_string) {
+                        continue;
+                    }
+                    $case_sensitive = is_array($this->case_sensitive) && isset($this->case_sensitive[$key]) && true === $this->case_sensitive[$key];
+                    $position       = $case_sensitive ? strpos($data, $search_string) : stripos($data, $search_string);
+                    if (false !== $position) {
+                        $needle_found = true;
+                        break 2;
+                    }
+                }
+            }
+
+            if (!$needle_found) {
+                return $data;
+            }
+        }
+
         if ($this->should_do_reference_check($table_prefix) && is_serialized( $data ) && preg_match('/r\:\d+;/i', $data)) {
             $current_row   = $this->get_row();
             $first_row_key = reset($current_row);

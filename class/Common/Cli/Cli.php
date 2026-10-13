@@ -210,6 +210,17 @@ class Cli
 			$this->post_data['intent'] = 'savefile';
 		}
 
+		/*
+		 * Table reads wpmdb_rows_per_segment in its constructor, before this intent is known.
+		 * Apply it again so a CLI savefile copies more rows per query. AJAX stays at the default.
+		 */
+		if (isset($this->post_data['intent']) && 'savefile' === $this->post_data['intent']) {
+			add_filter('wpmdb_rows_per_segment', static function () {
+				return 1000;
+			});
+			$this->table->rows_per_segment = (int) apply_filters('wpmdb_rows_per_segment', 100);
+		}
+
 		// Ensure local site_details available.
 		$this->post_data['site_details']['local'] = $this->util->site_details();
 

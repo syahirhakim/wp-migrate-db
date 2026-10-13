@@ -13,6 +13,7 @@ use DeliciousBrains\WPMDB\Common\Properties\Properties;
 use DeliciousBrains\WPMDB\Common\Replace;
 use DeliciousBrains\WPMDB\Common\Replace\CaseInsensitivePair;
 use DeliciousBrains\WPMDB\Common\Replace\PairFactory;
+use DeliciousBrains\WPMDB\Common\Replace\RegexPair;
 use DeliciousBrains\WPMDB\Common\Sql\TableHelper;
 use DeliciousBrains\WPMDB\Common\Util\Util;
 use PHPUnit\Framework\TestCase;
@@ -74,6 +75,79 @@ class ReplaceSkipSearchReplaceTest extends TestCase {
 		$result = $replace->recursive_unserialize_replace( self::OLD_URL );
 
 		$this->assertSame( self::NEW_URL, $result );
+	}
+
+	public function test_serialized_array_with_url_is_replaced_and_unserializes() {
+		$replace    = $this->make_replace( 'vbst_postmeta', 'wp_mig_' );
+		$serialized = serialize( array( 'url' => self::OLD_URL ) );
+
+		$result = $replace->recursive_unserialize_replace( $serialized );
+
+		$this->assertSame( array( 'url' => self::NEW_URL ), unserialize( $result ) );
+	}
+
+	public function test_serialized_array_without_url_is_returned_unchanged() {
+		$replace = $this->make_replace( 'vbst_postmeta', 'wp_mig_' );
+		/*
+		 * A numeric-string key is stored as an integer after unserialize/serialize.
+		 * The original bytes must survive when the find text is absent.
+		 */
+		$serialized = 'a:1:{s:1:"1";s:4:"note";}';
+
+		$result = $replace->recursive_unserialize_replace( $serialized );
+
+		$this->assertSame( $serialized, $result );
+	}
+
+	public function test_case_insensitive_pair_replaces_different_cased_url() {
+		$replace = $this->make_replace( 'vbst_postmeta', 'wp_mig_' );
+		$replace->set( 'case_sensitive', array( false ) );
+		$serialized = serialize( array( 'url' => 'https://OLD.example' ) );
+
+		$result = $replace->recursive_unserialize_replace( $serialized );
+
+		$this->assertSame( array( 'url' => self::NEW_URL ), unserialize( $result ) );
+	}
+
+	public function test_regex_pair_replaces_when_pattern_text_is_not_a_substring() {
+		$pattern = '#https://old\.example#';
+		$replace = $this->make_replace( 'vbst_postmeta', 'wp_mig_' );
+		$replace->set( 'search', array( 1 => $pattern ) );
+		$replace->set( 'replace', array( 1 => self::NEW_URL ) );
+		$replace->set( 'regex', array( 1 => true ) );
+		$replace->set( 'case_sensitive', array() );
+		$replace->set(
+			'pairs',
+			array(
+				new RegexPair( $pattern, self::NEW_URL ),
+			)
+		);
+
+		$result = $replace->recursive_unserialize_replace( self::OLD_URL );
+
+		$this->assertSame( self::NEW_URL, $result );
+	}
+
+	public function test_json_column_replaces_escaped_url_that_lacks_the_literal_needle() {
+		$replace = $this->make_replace( 'vbst_posts', 'wp_mig_' );
+		$escaped = Util::json_encode_trim( self::OLD_URL );
+		$replace->set( 'column', 'post_content' );
+		$replace->set( 'json_replace_tables', array( 'vbst_posts' ) );
+		$replace->set( 'json_replace_columns', array( 'post_content' ) );
+		$replace->set( 'json_search', array( $escaped ) );
+		$replace->set( 'json_merged', true );
+		$replace->set(
+			'pairs',
+			array(
+				new CaseInsensitivePair( self::OLD_URL, self::NEW_URL ),
+				new CaseInsensitivePair( $escaped, Util::json_encode_trim( self::NEW_URL ) ),
+			)
+		);
+
+		$value  = 'block ' . $escaped . ' end';
+		$result = $replace->recursive_unserialize_replace( $value );
+
+		$this->assertSame( 'block ' . Util::json_encode_trim( self::NEW_URL ) . ' end', $result );
 	}
 
 	/**

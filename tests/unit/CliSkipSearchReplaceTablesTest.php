@@ -33,6 +33,11 @@ class CliSkipSearchReplaceTablesTest extends TestCase {
 		$this->assertSame( array( 'foo', 'bar' ), $profile['current_migration']['search_replace_skip_tables_selected'] );
 	}
 
+	public function tearDown(): void {
+		remove_all_filters( 'wpmdb_rows_per_segment' );
+		parent::tearDown();
+	}
+
 	public function test_missing_skip_arg_leaves_an_empty_list() {
 		$cli     = $this->make_cli();
 		$profile = $cli->get_profile_data_from_args(
@@ -45,6 +50,81 @@ class CliSkipSearchReplaceTablesTest extends TestCase {
 		$this->assertIsArray( $profile );
 		$this->assertSame( array(), $profile['select_tables_skip_search_replace'] );
 		$this->assertSame( 'none', $profile['current_migration']['search_replace_skip_option'] );
+	}
+
+	public function test_savefile_uses_one_thousand_rows_per_segment() {
+		$table  = $this->createMock( Table::class );
+		$table->method( 'get_post_types' )->willReturn( array() );
+		$table->method( 'get_tables' )->willReturn( array( 'vbst_posts' ) );
+		$table->rows_per_segment = 100;
+
+		$cli    = $this->make_cli_with_table( $table );
+		$result = $cli->cli_migration( $this->profile_stopped_on_missing_table( 'savefile' ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 1000, $table->rows_per_segment );
+		$this->assertSame( 1000, (int) apply_filters( 'wpmdb_rows_per_segment', 100 ) );
+	}
+
+	public function test_find_replace_keeps_the_default_row_segment() {
+		$table  = $this->createMock( Table::class );
+		$table->method( 'get_post_types' )->willReturn( array() );
+		$table->method( 'get_tables' )->willReturn( array( 'vbst_posts' ) );
+		$table->rows_per_segment = 100;
+
+		$cli    = $this->make_cli_with_table( $table );
+		$result = $cli->cli_migration( $this->profile_stopped_on_missing_table( 'find_replace' ) );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 100, $table->rows_per_segment );
+		$this->assertSame( 100, (int) apply_filters( 'wpmdb_rows_per_segment', 100 ) );
+	}
+
+	/**
+	 * @param string $action
+	 * @return array
+	 */
+	private function profile_stopped_on_missing_table( $action ) {
+		return array(
+			'action'            => $action,
+			'select_tables'     => array( 'not_a_table' ),
+			'current_migration' => array(
+				'stages' => array( 'tables' ),
+			),
+		);
+	}
+
+	/**
+	 * @param Table $table
+	 * @return Cli
+	 */
+	private function make_cli_with_table( $table ) {
+		$util = $this->createMock( Util::class );
+		$util->method( 'site_details' )->willReturn( array() );
+
+		$form_data = $this->createMock( FormData::class );
+		$form_data->method( 'parse_and_save_migration_form_data' )->willReturnCallback(
+			function ( $json ) {
+				$profile = json_decode( $json, true );
+				if ( ! isset( $profile['current_migration']['stages'] ) ) {
+					$profile['current_migration']['stages'] = array( 'tables' );
+				}
+				return $profile;
+			}
+		);
+
+		return new Cli(
+			$form_data,
+			$util,
+			$this->createMock( CliManager::class ),
+			$table,
+			$this->createMock( ErrorLog::class ),
+			$this->createMock( InitiateMigration::class ),
+			$this->createMock( FinalizeMigration::class ),
+			$this->createMock( Helper::class ),
+			$this->createMock( MigrationManager::class ),
+			$this->createMock( MigrationStateManager::class )
+		);
 	}
 
 	/**
