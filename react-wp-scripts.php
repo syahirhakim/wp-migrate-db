@@ -257,11 +257,22 @@ function enqueue_assets($directory, $opts = [])
         $handle = $opts['handle'] . ($is_runtime ? '' : '-' . sanitize_key(basename($asset_path)));
 
         if ($is_js) {
+            /* The bundle filename stays the same when it is patched, so mtime is the cache key. */
+            $asset_version = null;
+            $build_marker  = '/' . get_build_folder_name() . '/';
+            $marker_pos    = strpos($asset_path, $build_marker);
+            if (false !== $marker_pos) {
+                $asset_file = wp_normalize_path(trailingslashit($directory) . substr($asset_path, $marker_pos + 1));
+                if (is_file($asset_file)) {
+                    $asset_version = filemtime($asset_file);
+                }
+            }
+
             wp_enqueue_script(
                 $handle,
                 get_asset_uri($asset_path, $base_url),
                 $opts['scripts'],
-                null,
+                $asset_version,
                 true
             );
         } elseif ($is_css) {
