@@ -4297,6 +4297,26 @@ msgstr ""
 msgid "Filepath is invalid"
 msgstr ""
 
+#: frontend/build-free/static/js/main.a92bb0cd600a.js
+msgid "Skip Find & Replace"
+msgstr ""
+
+#: frontend/build-free/static/js/main.a92bb0cd600a.js
+msgid "Find and replace all tables"
+msgstr ""
+
+#: frontend/build-free/static/js/main.a92bb0cd600a.js
+msgid "Skip selected tables"
+msgstr ""
+
+#: frontend/build-free/static/js/main.a92bb0cd600a.js
+msgid "Skip find and replace on selected tables"
+msgstr ""
+
+#: frontend/build-free/static/js/main.a92bb0cd600a.js
+msgid "Please select at least one table to skip"
+msgstr ""
+
 #: src/wp-migrate-db-pro/class/Pro/Transfers/Files/TransferManager.php:128
 #, php-format
 msgid "Error creating payload: %s"

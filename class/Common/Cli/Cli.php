@@ -748,7 +748,8 @@ class Cli
 			'exclude-post-revisions',
 			'skip-replace-guids',
 			'include-transients',
-            'exclude-database'
+			'exclude-database',
+			'skip-search-replace-tables',
 		);
 
 		$known_args   = apply_filters('wpmdb_cli_filter_get_extra_args', $known_args);
@@ -909,6 +910,17 @@ class Cli
 
 		$select_tables        = array();
 		$table_migrate_option = 'migrate_only_with_prefix';
+		$select_tables_skip_search_replace = array();
+
+		if (!empty($assoc_args['skip-search-replace-tables'])) {
+			$parsed_skip_tables = str_getcsv($assoc_args['skip-search-replace-tables']);
+			foreach ($parsed_skip_tables as $skip_table) {
+				$skip_table = trim($skip_table);
+				if ($skip_table !== '') {
+					$select_tables_skip_search_replace[] = $skip_table;
+				}
+			}
+		}
 
 		// --include-transients.
 		$exclude_transients = intval(!isset($assoc_args['include-transients']));
@@ -945,6 +957,7 @@ class Cli
 			'table_migrate_option',
 			'replace_new',
 			'select_tables',
+			'select_tables_skip_search_replace',
 			'exclude_post_types',
 			'select_post_types',
 			'replace_guids',

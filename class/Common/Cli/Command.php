@@ -55,6 +55,9 @@ class Command
 	 * [--skip-replace-guids]
 	 * : Do not perform a find & replace on the guid column in the wp_posts table.
 	 *
+	 * [--skip-search-replace-tables=<tables>]
+	 * : A comma separated list of tables to migrate without find and replace.
+	 *
 	 * [--exclude-spam]
 	 * : Exclude spam comments.
 	 *
@@ -129,6 +132,9 @@ class Command
 	 *
 	 * [--skip-replace-guids]
 	 * : Do not perform a find & replace on the guid column in the wp_posts table.
+	 *
+	 * [--skip-search-replace-tables=<tables>]
+	 * : A comma separated list of tables to migrate without find and replace.
 	 *
 	 * [--exclude-spam]
 	 * : Exclude spam comments.

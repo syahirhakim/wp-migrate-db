@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="tests/bootstrap.php"
+	colors="true"
+	beStrictAboutTestsThatDoNotTestAnything="true"
+	failOnRisky="true"
+	failOnWarning="true">
+	<testsuites>
+		<testsuite name="wp-migrate-db">
+			<directory suffix="Test.php">tests/unit</directory>
+		</testsuite>
+	</testsuites>
+	<php>
+		<env name="WP_PHPUNIT__TESTS_CONFIG" value="../vbest-tuition/tests/wp-tests-config.php" />
+	</php>
+</phpunit>

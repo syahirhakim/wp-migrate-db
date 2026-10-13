@@ -588,6 +588,13 @@ class Table
             return $structure_info;
         }
 
+        if ('find_replace' === $state_data['stage'] && $this->should_skip_search_replace_for_table($table, $state_data)) {
+            return array(
+                'current_row'  => -1,
+                'primary_keys' => json_encode($this->primary_keys),
+            );
+        }
+
         $this->pre_process_data($table, $target_table_name, $temp_table_name, $fp, $state_data);
         $to_search                     = isset($state_data['find_replace_pairs']['replace_old']) ? $state_data['find_replace_pairs']['replace_old'] : [];
         $to_replace                    = isset($state_data['find_replace_pairs']['replace_new']) ? $state_data['find_replace_pairs']['replace_new'] : [];
@@ -1513,7 +1520,8 @@ class Table
      */
     function process_row($table, $replacer, $row, $structure_info, $fp, $state_data)
     {
-        $form_data = $this->form_data->getFormData();
+        $form_data           = $this->form_data->getFormData();
+        $skip_search_replace = $this->should_skip_search_replace_for_table($table, $state_data);
 
         global $wpdb;
 
@@ -1587,7 +1595,7 @@ class Table
                     continue;
                 }
 
-                if (is_multisite() && in_array($table, array($wpdb->site, $wpdb->blogs, $this->props->temp_prefix . $wpdb->blogs, $this->props->temp_prefix . $wpdb->site))) {
+                if (!$skip_search_replace && is_multisite() && in_array($table, array($wpdb->site, $wpdb->blogs, $this->props->temp_prefix . $wpdb->blogs, $this->props->temp_prefix . $wpdb->site))) {
                     if ('backup' !== $state_data['stage']) {
                         if ('path' == $key) {
                             $old_path_current_site = $this->util->get_path_current_site();
@@ -1644,7 +1652,7 @@ class Table
                 }
 
                 if ('guid' != $key || (false === empty($form_data['replace_guids']) && $this->table_helper->table_is('posts', $table))) {
-                    if ($state_data['stage'] != 'backup') {
+                    if ($state_data['stage'] != 'backup' && !$skip_search_replace) {
                         $value = $replacer->recursive_unserialize_replace($value);
                     }
                 }
@@ -1727,6 +1735,29 @@ class Table
         }
 
         return true;
+    }
+
+    /**
+     * Whether row find/replace should be skipped for this table.
+     *
+     * @param string $table
+     * @param array  $state_data
+     *
+     * @return bool
+     */
+    public function should_skip_search_replace_for_table($table, $state_data)
+    {
+        $form_data = $this->form_data->getFormData();
+        $selected  = [];
+
+        if (is_array($form_data) && isset($form_data['select_tables_skip_search_replace']) && is_array($form_data['select_tables_skip_search_replace'])) {
+            $selected = $form_data['select_tables_skip_search_replace'];
+        }
+
+        $temp_prefix = isset($state_data['temp_prefix']) ? $state_data['temp_prefix'] : $this->props->temp_prefix;
+        global $wpdb;
+
+        return Replace::table_is_skipped($table, $selected, $temp_prefix, $wpdb->base_prefix);
     }
 
     /**

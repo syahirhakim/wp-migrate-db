@@ -1,0 +1,23 @@
+{
+	"name": "deliciousbrains/wp-migrate-db-tests",
+	"description": "PHPUnit harness for the WP Migrate DB fork. Dev dependencies install into tests/vendor only.",
+	"type": "project",
+	"require-dev": {
+		"phpunit/phpunit": "^9.6",
+		"wp-phpunit/wp-phpunit": "^6.8",
+		"yoast/phpunit-polyfills": "^4.0"
+	},
+	"autoload-dev": {
+		"psr-4": {
+			"DeliciousBrains\\WPMDB\\Tests\\Unit\\": "unit/",
+			"DeliciousBrains\\WPMDB\\Tests\\Support\\": "support/"
+		}
+	},
+	"config": {
+		"vendor-dir": "vendor",
+		"process-timeout": 0
+	},
+	"scripts": {
+		"test": "phpunit -c ../phpunit.xml.dist"
+	}
+}

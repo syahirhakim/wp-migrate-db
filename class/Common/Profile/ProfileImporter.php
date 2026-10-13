@@ -480,19 +480,26 @@ class ProfileImporter
      */
     protected function composeCurrentMigrationDetails($profile, $intent, $profileObj, array $post_types, array $advanced_options)
     {
+        $skip_tables = [];
+        if (isset($profileObj->select_tables_skip_search_replace) && is_array($profileObj->select_tables_skip_search_replace)) {
+            $skip_tables = $profileObj->select_tables_skip_search_replace;
+        }
+
         $current_migration_details = [
-            'connected'                 => false,
-            'intent'                    => $intent,
-            'tables_option'             => !empty($profileObj->table_migrate_option) && $profileObj->table_migrate_option === 'migrate_select' ? 'selected' : 'all',
-            'tables_selected'           => !empty($profileObj->select_tables) ? $profileObj->select_tables : [],
-            'backup_option'             => $profileObj->create_backup != "0" ? $profileObj->backup_option : 'none',
-            'backup_tables_selected'    => !empty($profileObj->select_backup) ? $profileObj->select_backup : [],
-            'post_types_option'         => !empty($profileObj->exclude_post_types) && $profileObj->exclude_post_types === '1' ? 'selected' : 'all',
-            'post_types_selected'       => $post_types,
-            'advanced_options_selected' => $advanced_options,
-            'profile_name'              => $profileObj->name,
-            'migration_enabled'         => in_array($intent, ['savefile', 'find_replace']) ? true : false,
-            'databaseEnabled'           => isset($profile['databaseEnabled']) ? $profile['databaseEnabled'] : true
+            'connected'                           => false,
+            'intent'                              => $intent,
+            'tables_option'                       => !empty($profileObj->table_migrate_option) && $profileObj->table_migrate_option === 'migrate_select' ? 'selected' : 'all',
+            'tables_selected'                     => !empty($profileObj->select_tables) ? $profileObj->select_tables : [],
+            'backup_option'                       => $profileObj->create_backup != "0" ? $profileObj->backup_option : 'none',
+            'backup_tables_selected'              => !empty($profileObj->select_backup) ? $profileObj->select_backup : [],
+            'post_types_option'                   => !empty($profileObj->exclude_post_types) && $profileObj->exclude_post_types === '1' ? 'selected' : 'all',
+            'post_types_selected'                 => $post_types,
+            'advanced_options_selected'           => $advanced_options,
+            'profile_name'                        => $profileObj->name,
+            'migration_enabled'                   => in_array($intent, ['savefile', 'find_replace']) ? true : false,
+            'databaseEnabled'                     => isset($profile['databaseEnabled']) ? $profile['databaseEnabled'] : true,
+            'search_replace_skip_option'          => !empty($skip_tables) ? 'manual_select' : 'none',
+            'search_replace_skip_tables_selected' => $skip_tables,
         ];
 
         $current_migration_details = $this->appendExtraProfileOpts($profile, $current_migration_details);

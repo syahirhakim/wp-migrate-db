@@ -602,6 +602,43 @@ class Replace
     }
 
     /**
+     * Whether find/replace should leave this table unchanged.
+     *
+     * Matches a full table name, or a suffix stored without the base prefix (eum_logs).
+     * A temporary migration prefix is stripped before comparing.
+     *
+     * @param string $table
+     * @param array  $skipped_tables
+     * @param string $temp_prefix
+     * @param string $base_prefix
+     *
+     * @return bool
+     */
+    public static function table_is_skipped($table, $skipped_tables, $temp_prefix, $base_prefix)
+    {
+        if (!is_array($skipped_tables)) {
+            return false;
+        }
+
+        $normalized  = (string) $table;
+        $temp_prefix = (string) $temp_prefix;
+        if ($temp_prefix !== '' && strpos($normalized, $temp_prefix) === 0) {
+            $normalized = substr($normalized, strlen($temp_prefix));
+        }
+
+        foreach ($skipped_tables as $skipped_table) {
+            if (!is_string($skipped_table) || $skipped_table === '') {
+                continue;
+            }
+            if ($normalized === $skipped_table || $normalized === $base_prefix . $skipped_table) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Take a serialized array and unserialize it replacing elements as needed and
      * unserialising any subordinate arrays and performing the replace on those too.
      *
@@ -631,10 +668,8 @@ class Replace
 
         //Check if find and replace needs be skipped for the current table
         $skipped_tables = apply_filters('wpmdb_skip_search_replace_tables', ['eum_logs']);
-        foreach ($skipped_tables as $skipped_table) {
-            if ($this->table === $table_prefix . $skipped_table) {
-                return $data;
-            }
+        if (self::table_is_skipped($this->table, $skipped_tables, $this->properties->temp_prefix, $wpdb->base_prefix)) {
+            return $data;
         }
 
         if ($this->should_do_reference_check($table_prefix) && is_serialized( $data ) && preg_match('/r\:\d+;/i', $data)) {

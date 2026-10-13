@@ -125,6 +125,7 @@ class ProfileManager
             'default_profile'           => true,
             'name'                      => '',
             'select_tables'             => [],
+            'select_tables_skip_search_replace' => [],
             'select_post_types'         => [],
             'backup_option'             => 'backup_only_with_prefix',
             'exclude_transients'        => '1',

@@ -43,6 +43,7 @@ class FormData
         'exclude_spam',
         'keep_active_plugins',
         'gzip_file',
+        'select_tables_skip_search_replace',
     ];
 
     public function __construct(
@@ -82,7 +83,10 @@ class FormData
             'search_replace',
             'regex',
             'case_sensitive',
+            'select_tables_skip_search_replace',
         );
+
+        add_filter('wpmdb_skip_search_replace_tables', array($this, 'merge_skip_search_replace_tables_from_form'), 10, 1);
     }
 
     public function get_accepted_fields()
@@ -115,6 +119,7 @@ class FormData
             'keep_active_plugins'       => in_array('keep_active_plugins', $advanced_options) ? '1' : '0',
             'gzip_file'                 => in_array('gzip_file', $advanced_options) ? '1' : '0',
             'exclude_post_types'       => '0',
+            'select_tables_skip_search_replace' => isset($current_migration['search_replace_skip_option']) && $current_migration['search_replace_skip_option'] === 'manual_select' && isset($current_migration['search_replace_skip_tables_selected']) && is_array($current_migration['search_replace_skip_tables_selected']) ? $current_migration['search_replace_skip_tables_selected'] : [],
         ];
 
         if (in_array($current_migration['intent'], array('push', 'pull'))) {
@@ -273,5 +278,27 @@ class FormData
     public function setFormData($form_data)
     {
         $this->form_data = $form_data;
+    }
+
+    /**
+     * Merge the saved per-table skip list with the default skipped tables.
+     *
+     * @param array $tables
+     * @return array
+     */
+    public function merge_skip_search_replace_tables_from_form($tables)
+    {
+        if (!is_array($tables)) {
+            $tables = [];
+        }
+
+        $selected  = [];
+        $form_data = $this->getFormData();
+
+        if (is_array($form_data) && isset($form_data['select_tables_skip_search_replace']) && is_array($form_data['select_tables_skip_search_replace'])) {
+            $selected = $form_data['select_tables_skip_search_replace'];
+        }
+
+        return array_values(array_unique(array_merge($tables, $selected)));
     }
 }
