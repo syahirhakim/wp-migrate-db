@@ -23,6 +23,7 @@ class MigrationFormFactory {
 			'advanced_options_selected'           => array(),
 			'search_replace_skip_option'          => 'none',
 			'search_replace_skip_tables_selected' => array(),
+			'rows_per_export'                     => 1000,
 		);
 
 		return array_merge( $migration, $overrides );
@@ -50,6 +51,7 @@ class MigrationFormFactory {
 			'action'                            => 'savefile',
 			'select_tables'                     => array(),
 			'select_tables_skip_search_replace' => array(),
+			'rows_per_export'                   => 1000,
 		);
 
 		return (object) array_merge( $profile, $overrides );

@@ -44,6 +44,7 @@ class FormData
         'keep_active_plugins',
         'gzip_file',
         'select_tables_skip_search_replace',
+        'rows_per_export',
     ];
 
     public function __construct(
@@ -84,6 +85,7 @@ class FormData
             'regex',
             'case_sensitive',
             'select_tables_skip_search_replace',
+            'rows_per_export',
         );
 
         add_filter('wpmdb_skip_search_replace_tables', array($this, 'merge_skip_search_replace_tables_from_form'), 10, 1);
@@ -121,6 +123,12 @@ class FormData
             'exclude_post_types'       => '0',
             'select_tables_skip_search_replace' => isset($current_migration['search_replace_skip_option']) && $current_migration['search_replace_skip_option'] === 'manual_select' && isset($current_migration['search_replace_skip_tables_selected']) && is_array($current_migration['search_replace_skip_tables_selected']) ? $current_migration['search_replace_skip_tables_selected'] : [],
         ];
+
+        if (isset($current_migration['rows_per_export']) && $current_migration['rows_per_export'] !== '') {
+            $return['rows_per_export'] = $this->sanitize_rows_per_export($current_migration['rows_per_export']);
+        } elseif (isset($data['rows_per_export']) && $data['rows_per_export'] !== '') {
+            $return['rows_per_export'] = $this->sanitize_rows_per_export($data['rows_per_export']);
+        }
 
         if (in_array($current_migration['intent'], array('push', 'pull'))) {
             $return['connection_info'] = isset($data['connection_info'], $data['connection_info']['connection_state']) ? $data['connection_info']['connection_state']['value'] : '';
@@ -300,5 +308,85 @@ class FormData
         }
 
         return array_values(array_unique(array_merge($tables, $selected)));
+    }
+
+    /**
+     * @param mixed $value
+     * @return int
+     */
+    public function sanitize_rows_per_export($value)
+    {
+        $rows = (int) $value;
+
+        if ($rows < 1) {
+            return 1;
+        }
+
+        if ($rows > 10000) {
+            return 10000;
+        }
+
+        return $rows;
+    }
+
+    /**
+     * @return int|null
+     */
+    public function get_rows_per_export_from_form()
+    {
+        $form_data = $this->getFormData();
+
+        if (!is_array($form_data)) {
+            return null;
+        }
+
+        if (isset($form_data['rows_per_export']) && $form_data['rows_per_export'] !== '') {
+            return $this->sanitize_rows_per_export($form_data['rows_per_export']);
+        }
+
+        if (isset($form_data['current_migration']['rows_per_export']) && $form_data['current_migration']['rows_per_export'] !== '') {
+            return $this->sanitize_rows_per_export($form_data['current_migration']['rows_per_export']);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param string $intent
+     * @return int
+     */
+    public function resolve_rows_per_segment_for_intent($intent)
+    {
+        $export_intents = array('savefile', 'backup_local');
+
+        if (in_array($intent, $export_intents, true)) {
+            $from_form = $this->get_rows_per_export_from_form();
+
+            if (null !== $from_form) {
+                return $from_form;
+            }
+
+            return 1000;
+        }
+
+        return 100;
+    }
+
+    /**
+     * @param Table $table
+     * @param string $intent
+     */
+    public function apply_rows_per_segment_for_intent(Table $table, $intent)
+    {
+        $rows                    = $this->resolve_rows_per_segment_for_intent($intent);
+        $table->rows_per_segment = $rows;
+
+        add_filter(
+            'wpmdb_rows_per_segment',
+            static function () use ($rows) {
+                return $rows;
+            },
+            100
+        );
     }
 }

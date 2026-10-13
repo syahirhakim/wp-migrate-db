@@ -241,6 +241,7 @@ class MigrationManager
         global $wpdb;
         // ***+=== @TODO - revisit usage of parse_migration_form_data
         $this->migration_options = $this->form_data->parse_and_save_migration_form_data($state_data['form_data']);
+        $this->form_data->apply_rows_per_segment_for_intent($this->table, $state_data['intent']);
 
         if ('import' === $state_data['intent'] && !$this->table->table_exists($state_data['table'])) {
             return $this->http->end_ajax(json_encode(array('current_row' => -1)));

@@ -485,6 +485,16 @@ class ProfileImporter
             $skip_tables = $profileObj->select_tables_skip_search_replace;
         }
 
+        $rows_per_export = 1000;
+        if (isset($profileObj->rows_per_export) && $profileObj->rows_per_export !== '') {
+            $rows_per_export = (int) $profileObj->rows_per_export;
+            if ($rows_per_export < 1) {
+                $rows_per_export = 1;
+            } elseif ($rows_per_export > 10000) {
+                $rows_per_export = 10000;
+            }
+        }
+
         $current_migration_details = [
             'connected'                           => false,
             'intent'                              => $intent,
@@ -500,6 +510,7 @@ class ProfileImporter
             'databaseEnabled'                     => isset($profile['databaseEnabled']) ? $profile['databaseEnabled'] : true,
             'search_replace_skip_option'          => !empty($skip_tables) ? 'manual_select' : 'none',
             'search_replace_skip_tables_selected' => $skip_tables,
+            'rows_per_export'                     => $rows_per_export,
         ];
 
         $current_migration_details = $this->appendExtraProfileOpts($profile, $current_migration_details);

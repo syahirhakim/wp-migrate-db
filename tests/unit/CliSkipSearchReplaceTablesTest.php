@@ -6,13 +6,14 @@ use DeliciousBrains\WPMDB\Common\Cli\Cli;
 use DeliciousBrains\WPMDB\Common\Cli\CliManager;
 use DeliciousBrains\WPMDB\Common\Error\ErrorLog;
 use DeliciousBrains\WPMDB\Common\FormData\FormData;
+use DeliciousBrains\WPMDB\Common\MigrationState\MigrationStateManager;
 use DeliciousBrains\WPMDB\Common\Http\Helper;
 use DeliciousBrains\WPMDB\Common\Migration\FinalizeMigration;
 use DeliciousBrains\WPMDB\Common\Migration\InitiateMigration;
 use DeliciousBrains\WPMDB\Common\Migration\MigrationManager;
-use DeliciousBrains\WPMDB\Common\MigrationState\MigrationStateManager;
 use DeliciousBrains\WPMDB\Common\Sql\Table;
 use DeliciousBrains\WPMDB\Common\Util\Util;
+use DeliciousBrains\WPMDB\Tests\Support\MigrationFormFactory;
 use PHPUnit\Framework\TestCase;
 
 class CliSkipSearchReplaceTablesTest extends TestCase {
@@ -52,6 +53,21 @@ class CliSkipSearchReplaceTablesTest extends TestCase {
 		$this->assertSame( 'none', $profile['current_migration']['search_replace_skip_option'] );
 	}
 
+	public function test_rows_per_export_arg_sets_profile_value() {
+		$cli     = $this->make_cli();
+		$profile = $cli->get_profile_data_from_args(
+			array(),
+			array(
+				'action'           => 'savefile',
+				'rows-per-export'  => '2500',
+			)
+		);
+
+		$this->assertIsArray( $profile );
+		$this->assertSame( 2500, $profile['rows_per_export'] );
+		$this->assertSame( 2500, $profile['current_migration']['rows_per_export'] );
+	}
+
 	public function test_savefile_uses_one_thousand_rows_per_segment() {
 		$table  = $this->createMock( Table::class );
 		$table->method( 'get_post_types' )->willReturn( array() );
@@ -64,6 +80,22 @@ class CliSkipSearchReplaceTablesTest extends TestCase {
 		$this->assertInstanceOf( \WP_Error::class, $result );
 		$this->assertSame( 1000, $table->rows_per_segment );
 		$this->assertSame( 1000, (int) apply_filters( 'wpmdb_rows_per_segment', 100 ) );
+	}
+
+	public function test_savefile_uses_custom_rows_per_segment_from_profile() {
+		$table  = $this->createMock( Table::class );
+		$table->method( 'get_post_types' )->willReturn( array() );
+		$table->method( 'get_tables' )->willReturn( array( 'vbst_posts' ) );
+		$table->rows_per_segment = 100;
+
+		$cli    = $this->make_cli_with_table( $table );
+		$profile = $this->profile_stopped_on_missing_table( 'savefile' );
+		$profile['rows_per_export']                      = 2500;
+		$profile['current_migration']['rows_per_export'] = 2500;
+		$result = $cli->cli_migration( $profile );
+
+		$this->assertInstanceOf( \WP_Error::class, $result );
+		$this->assertSame( 2500, $table->rows_per_segment );
 	}
 
 	public function test_find_replace_keeps_the_default_row_segment() {
@@ -85,12 +117,19 @@ class CliSkipSearchReplaceTablesTest extends TestCase {
 	 * @return array
 	 */
 	private function profile_stopped_on_missing_table( $action ) {
-		return array(
-			'action'            => $action,
-			'select_tables'     => array( 'not_a_table' ),
-			'current_migration' => array(
-				'stages' => array( 'tables' ),
+		return array_merge(
+			MigrationFormFactory::form_data(
+				array(
+					'intent'          => $action,
+					'stages'          => array( 'tables' ),
+					'tables_option'   => 'selected',
+					'tables_selected' => array( 'not_a_table' ),
+				)
 			),
+			array(
+				'action'        => $action,
+				'select_tables' => array( 'not_a_table' ),
+			)
 		);
 	}
 
@@ -102,14 +141,19 @@ class CliSkipSearchReplaceTablesTest extends TestCase {
 		$util = $this->createMock( Util::class );
 		$util->method( 'site_details' )->willReturn( array() );
 
-		$form_data = $this->createMock( FormData::class );
+		$real_form_data = new FormData(
+			$this->createMock( Util::class ),
+			$this->createMock( MigrationStateManager::class )
+		);
+		$form_data      = $this->createMock( FormData::class );
 		$form_data->method( 'parse_and_save_migration_form_data' )->willReturnCallback(
-			function ( $json ) {
-				$profile = json_decode( $json, true );
-				if ( ! isset( $profile['current_migration']['stages'] ) ) {
-					$profile['current_migration']['stages'] = array( 'tables' );
-				}
-				return $profile;
+			function ( $json ) use ( $real_form_data ) {
+				return $real_form_data->parse_and_save_migration_form_data( $json );
+			}
+		);
+		$form_data->method( 'apply_rows_per_segment_for_intent' )->willReturnCallback(
+			function ( $table, $intent ) use ( $real_form_data ) {
+				$real_form_data->apply_rows_per_segment_for_intent( $table, $intent );
 			}
 		);
 

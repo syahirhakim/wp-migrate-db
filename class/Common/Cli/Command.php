@@ -67,6 +67,9 @@ class Command
 	 * [--include-transients]
 	 * : Include transients (temporary cached data).
 	 *
+	 * [--rows-per-export=<count>]
+	 * : Number of database rows to read per request during export (1-10000, default 1000).
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp migratedb export ./migratedb.sql \

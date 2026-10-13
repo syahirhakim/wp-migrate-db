@@ -210,15 +210,8 @@ class Cli
 			$this->post_data['intent'] = 'savefile';
 		}
 
-		/*
-		 * Table reads wpmdb_rows_per_segment in its constructor, before this intent is known.
-		 * Apply it again so a CLI savefile copies more rows per query. AJAX stays at the default.
-		 */
 		if (isset($this->post_data['intent']) && 'savefile' === $this->post_data['intent']) {
-			add_filter('wpmdb_rows_per_segment', static function () {
-				return 1000;
-			});
-			$this->table->rows_per_segment = (int) apply_filters('wpmdb_rows_per_segment', 100);
+			$this->form_data->apply_rows_per_segment_for_intent($this->table, 'savefile');
 		}
 
 		// Ensure local site_details available.
@@ -761,6 +754,7 @@ class Cli
 			'include-transients',
 			'exclude-database',
 			'skip-search-replace-tables',
+			'rows-per-export',
 		);
 
 		$known_args   = apply_filters('wpmdb_cli_filter_get_extra_args', $known_args);
@@ -922,6 +916,7 @@ class Cli
 		$select_tables        = array();
 		$table_migrate_option = 'migrate_only_with_prefix';
 		$select_tables_skip_search_replace = array();
+		$rows_per_export      = null;
 
 		if (!empty($assoc_args['skip-search-replace-tables'])) {
 			$parsed_skip_tables = str_getcsv($assoc_args['skip-search-replace-tables']);
@@ -935,6 +930,10 @@ class Cli
 
 		// --include-transients.
 		$exclude_transients = intval(!isset($assoc_args['include-transients']));
+
+		if (isset($assoc_args['rows-per-export'])) {
+			$rows_per_export = (int) $assoc_args['rows-per-export'];
+		}
 
 		//cleanup filename for exports
 		if (!empty($export_dest)) {
@@ -983,6 +982,10 @@ class Cli
 			'case_sensitive',
             'databaseEnabled'
 		);
+
+		if (null !== $rows_per_export) {
+			$profile['rows_per_export'] = $rows_per_export;
+		}
 
 		$home        = preg_replace('/^https?:/', '', home_url());
 		$path        = esc_html(addslashes(Util::get_absolute_root_file_path()));

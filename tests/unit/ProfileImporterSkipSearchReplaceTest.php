@@ -63,6 +63,7 @@ class ProfileImporterSkipSearchReplaceTest extends TestCase {
 		$profile = $manager->get_profile( 0 );
 
 		$this->assertSame( array(), $profile['select_tables_skip_search_replace'] );
+		$this->assertSame( 1000, $profile['rows_per_export'] );
 	}
 
 	/**

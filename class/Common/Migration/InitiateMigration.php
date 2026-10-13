@@ -160,6 +160,7 @@ class InitiateMigration
         // This only needs to be called once per request cycle
         // @see FormData::getFormData();
         $this->migration_options = $this->form_data->parse_and_save_migration_form_data($state_data['form_data']);
+        $this->form_data->apply_rows_per_segment_for_intent($this->table, $state_data['intent']);
 
         update_site_option('wpmdb_usage', array('action' => $state_data['intent'], 'time' => time()));
 

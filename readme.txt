@@ -554,7 +554,7 @@ Yes, WP Migrate Lite includes `export` and `find-replace` commands. Qualifying l
 
 == Fork notes ==
 
-The Database step can skip find and replace on selected tables. That behavior is implemented in PHP and in the customized bundle `frontend/build-free/static/js/main.a92bb0cd600a.js` (`search_replace_skip_option`, `search_replace_skip_tables_selected`). Replacing that file on an upstream upgrade removes the panel.
+The Database step can skip find and replace on selected tables, and can set rows per export for save-to-file migrations. That behavior is implemented in PHP and in the customized bundle `frontend/build-free/static/js/main.a92bb0cd600a.js` (`search_replace_skip_option`, `search_replace_skip_tables_selected`, `rows_per_export`). Replacing that file on an upstream upgrade removes those panels.
 
 == Upgrade Notice ==
 
