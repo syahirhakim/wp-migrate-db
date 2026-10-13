@@ -674,11 +674,17 @@ class Replace
 
         /*
          * Literal find text is still a contiguous substring inside serialized and JSON values.
-         * Skip unserialize-and-replace when it cannot change this string. Regex, subdomain, and
-         * protocol-mismatch modes can rewrite text that does not contain the typed find string.
+         * Skip unserialize-and-replace when it cannot change this string. Non-literal replace modes
+         * and custom-data filters can rewrite values that do not contain the typed find string.
          */
-        $has_regex_pair = is_array($this->regex) && in_array(true, $this->regex, true);
-        if (is_string($data) && !$has_regex_pair && !$this->is_subdomain_replaces_on() && true !== $this->is_protocol_mismatch) {
+        $non_literal_replace = (is_array($this->regex) && in_array(true, $this->regex, true))
+            || $this->is_subdomain_replaces_on()
+            || true === $this->is_protocol_mismatch
+            || has_filter('wpmdb_before_replace_custom_data')
+            || has_filter('wpmdb_replace_custom_data')
+            || has_filter('wpmdb_after_replace_custom_data');
+
+        if (is_string($data) && !$non_literal_replace) {
             $needle_lists = is_array($this->search) ? array($this->search) : array();
             if (
                 is_array($this->json_search)

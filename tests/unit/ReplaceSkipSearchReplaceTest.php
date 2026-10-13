@@ -25,6 +25,7 @@ class ReplaceSkipSearchReplaceTest extends TestCase {
 
 	public function tearDown(): void {
 		remove_all_filters( 'wpmdb_skip_search_replace_tables' );
+		remove_all_filters( 'wpmdb_replace_custom_data' );
 		parent::tearDown();
 	}
 
@@ -84,6 +85,23 @@ class ReplaceSkipSearchReplaceTest extends TestCase {
 		$result = $replace->recursive_unserialize_replace( $serialized );
 
 		$this->assertSame( array( 'url' => self::NEW_URL ), unserialize( $result ) );
+	}
+
+	public function test_custom_data_filter_runs_when_find_text_is_absent() {
+		$replace = $this->make_replace( 'vbst_postmeta', 'wp_mig_' );
+		$marker  = 'custom-filter-ran';
+
+		add_filter(
+			'wpmdb_replace_custom_data',
+			function ( $args ) use ( $marker ) {
+				$args[0] .= $marker;
+				return $args;
+			}
+		);
+
+		$result = $replace->recursive_unserialize_replace( 'plain text without url' );
+
+		$this->assertSame( 'plain text without url' . $marker, $result );
 	}
 
 	public function test_serialized_array_without_url_is_returned_unchanged() {
