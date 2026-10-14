@@ -1,2 +1,3 @@
 .sass-cache
 tests/vendor/
+.phpunit.result.cache

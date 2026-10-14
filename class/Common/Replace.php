@@ -123,6 +123,26 @@ class Replace
     protected $json_merged;
 
     /**
+     * @var bool
+     */
+    private $replace_fast_path_ready = false;
+
+    /**
+     * @var bool
+     */
+    private $replace_table_skipped = false;
+
+    /**
+     * @var bool
+     */
+    private $replace_literal_scan = false;
+
+    /**
+     * @var bool
+     */
+    private $replace_has_pre_filter = false;
+
+    /**
      * @var array
      */
     private $regex;
@@ -245,6 +265,7 @@ class Replace
         $this->json_replace_tables  = '';
         $this->json_replace_columns = '';
         $this->json_merged          = false;
+        $this->replace_fast_path_ready = false;
 
         // Set diff interpreter table name
         $this->diff_interpreter->getGroup()->setTable($this->table);
@@ -653,9 +674,70 @@ class Replace
      */
     function recursive_unserialize_replace($data, $serialized = false, $parent_serialized = false, $filtered = true)
     {
-        $pre = apply_filters('wpmdb_pre_recursive_unserialize_replace', false, $data, $this);
-        if (false !== $pre) {
-            return $pre;
+        if ( ! $this->replace_fast_path_ready ) {
+            global $wpdb;
+            $skipped_tables = apply_filters( 'wpmdb_skip_search_replace_tables', array( 'eum_logs' ) );
+            $temp_prefix    = isset( $this->properties->temp_prefix ) ? $this->properties->temp_prefix : '';
+            $base_prefix    = isset( $wpdb->base_prefix ) ? $wpdb->base_prefix : '';
+            $this->replace_table_skipped  = self::table_is_skipped( $this->table, $skipped_tables, $temp_prefix, $base_prefix );
+            $this->replace_has_pre_filter = false !== has_filter( 'wpmdb_pre_recursive_unserialize_replace' );
+            $this->replace_literal_scan   = ! (
+                ( is_array( $this->regex ) && in_array( true, $this->regex, true ) )
+                || $this->is_subdomain_replaces_on()
+                || true === $this->is_protocol_mismatch
+                || has_filter( 'wpmdb_before_replace_custom_data' )
+                || has_filter( 'wpmdb_replace_custom_data' )
+                || has_filter( 'wpmdb_after_replace_custom_data' )
+            );
+            $this->replace_fast_path_ready = true;
+        }
+
+        /*
+         * A skipped table, or a string that does not contain a literal find value, cannot change.
+         * Return before the per-cell filters. Custom-data filters and non-literal modes still
+         * run the full path because they can rewrite values that do not contain the find text.
+         */
+        if ( $this->replace_table_skipped && ! $this->replace_has_pre_filter ) {
+            return $data;
+        }
+
+        if ( $this->replace_literal_scan && ! $this->replace_has_pre_filter && is_string( $data ) ) {
+            $needle_lists = is_array( $this->search ) ? array( $this->search ) : array();
+            if (
+                is_array( $this->json_search )
+                && is_array( $this->json_replace_tables )
+                && is_array( $this->json_replace_columns )
+                && in_array( $this->table, $this->json_replace_tables, true )
+                && in_array( $this->column, $this->json_replace_columns, true )
+            ) {
+                $needle_lists[] = $this->json_search;
+            }
+
+            $needle_found = false;
+            foreach ( $needle_lists as $needles ) {
+                foreach ( $needles as $key => $search_string ) {
+                    if ( ! is_string( $search_string ) || '' === $search_string ) {
+                        continue;
+                    }
+                    $case_sensitive = is_array( $this->case_sensitive ) && isset( $this->case_sensitive[ $key ] ) && true === $this->case_sensitive[ $key ];
+                    $position       = $case_sensitive ? strpos( $data, $search_string ) : stripos( $data, $search_string );
+                    if ( false !== $position ) {
+                        $needle_found = true;
+                        break 2;
+                    }
+                }
+            }
+
+            if ( ! $needle_found ) {
+                return $data;
+            }
+        }
+
+        if ( $this->replace_has_pre_filter ) {
+            $pre = apply_filters( 'wpmdb_pre_recursive_unserialize_replace', false, $data, $this );
+            if ( false !== $pre ) {
+                return $pre;
+            }
         }
 
         //If the intent is find_replace we need to prefix the tables with the temp prefix and wp base table prefix.
@@ -666,52 +748,44 @@ class Replace
             $table_prefix = $this->properties->temp_prefix . $table_prefix;
         }
 
-        //Check if find and replace needs be skipped for the current table
-        $skipped_tables = apply_filters('wpmdb_skip_search_replace_tables', ['eum_logs']);
-        if (self::table_is_skipped($this->table, $skipped_tables, $this->properties->temp_prefix, $wpdb->base_prefix)) {
+        if ( $this->replace_table_skipped ) {
             return $data;
         }
 
         /*
          * Literal find text is still a contiguous substring inside serialized and JSON values.
-         * Skip unserialize-and-replace when it cannot change this string. Non-literal replace modes
-         * and custom-data filters can rewrite values that do not contain the typed find string.
+         * Skip unserialize-and-replace when it cannot change this string. The miss path above
+         * already returned when there is no pre-filter. This pass covers a pre-filter that
+         * rewrote $data, and keeps the same bail for any string that still lacks the needle.
          */
-        $non_literal_replace = (is_array($this->regex) && in_array(true, $this->regex, true))
-            || $this->is_subdomain_replaces_on()
-            || true === $this->is_protocol_mismatch
-            || has_filter('wpmdb_before_replace_custom_data')
-            || has_filter('wpmdb_replace_custom_data')
-            || has_filter('wpmdb_after_replace_custom_data');
-
-        if (is_string($data) && !$non_literal_replace) {
-            $needle_lists = is_array($this->search) ? array($this->search) : array();
+        if ( is_string( $data ) && $this->replace_literal_scan ) {
+            $needle_lists = is_array( $this->search ) ? array( $this->search ) : array();
             if (
-                is_array($this->json_search)
-                && is_array($this->json_replace_tables)
-                && is_array($this->json_replace_columns)
-                && in_array($this->table, $this->json_replace_tables, true)
-                && in_array($this->column, $this->json_replace_columns, true)
+                is_array( $this->json_search )
+                && is_array( $this->json_replace_tables )
+                && is_array( $this->json_replace_columns )
+                && in_array( $this->table, $this->json_replace_tables, true )
+                && in_array( $this->column, $this->json_replace_columns, true )
             ) {
                 $needle_lists[] = $this->json_search;
             }
 
             $needle_found = false;
-            foreach ($needle_lists as $needles) {
-                foreach ($needles as $key => $search_string) {
-                    if (!is_string($search_string) || '' === $search_string) {
+            foreach ( $needle_lists as $needles ) {
+                foreach ( $needles as $key => $search_string ) {
+                    if ( ! is_string( $search_string ) || '' === $search_string ) {
                         continue;
                     }
-                    $case_sensitive = is_array($this->case_sensitive) && isset($this->case_sensitive[$key]) && true === $this->case_sensitive[$key];
-                    $position       = $case_sensitive ? strpos($data, $search_string) : stripos($data, $search_string);
-                    if (false !== $position) {
+                    $case_sensitive = is_array( $this->case_sensitive ) && isset( $this->case_sensitive[ $key ] ) && true === $this->case_sensitive[ $key ];
+                    $position       = $case_sensitive ? strpos( $data, $search_string ) : stripos( $data, $search_string );
+                    if ( false !== $position ) {
                         $needle_found = true;
                         break 2;
                     }
                 }
             }
 
-            if (!$needle_found) {
+            if ( ! $needle_found ) {
                 return $data;
             }
         }
